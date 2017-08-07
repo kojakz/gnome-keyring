@@ -9,11 +9,11 @@ BEGIN
 
 RSAPublicKey ::= SEQUENCE {
         modulus                 INTEGER, -- n
-        publicExponent          INTEGER  -- e 
+        publicExponent          INTEGER  -- e
 }
 
--- 
--- Representation of RSA private key with information for the 
+--
+-- Representation of RSA private key with information for the
 -- CRT algorithm.
 --
 RSAPrivateKey ::= SEQUENCE {
@@ -39,7 +39,7 @@ OtherPrimeInfos ::= SEQUENCE SIZE(1..MAX) OF OtherPrimeInfo
 OtherPrimeInfo ::= SEQUENCE {
 	prime INTEGER,  -- ri
 	exponent INTEGER, -- di
-	coefficient INTEGER -- ti 
+	coefficient INTEGER -- ti
 }
 
 -- for signature calculation
@@ -47,7 +47,7 @@ OtherPrimeInfo ::= SEQUENCE {
 
 AlgorithmIdentifier ::= SEQUENCE  {
      algorithm               OBJECT IDENTIFIER,
-     parameters              ANY DEFINED BY algorithm OPTIONAL  
+     parameters              ANY DEFINED BY algorithm OPTIONAL
 }
                                 -- contains a value of the type
                                 -- registered for use with the
@@ -55,7 +55,7 @@ AlgorithmIdentifier ::= SEQUENCE  {
 
 DigestInfo ::= SEQUENCE {
      digestAlgorithm DigestAlgorithmIdentifier,
-     digest Digest 
+     digest Digest
 }
 
 DigestAlgorithmIdentifier ::= AlgorithmIdentifier
@@ -98,8 +98,78 @@ DSAPrivateKey ::= SEQUENCE {
 DHParameter ::= SEQUENCE {
 	prime INTEGER, -- p
 	base INTEGER, -- g
-	privateValueLength INTEGER OPTIONAL 
+	privateValueLength INTEGER OPTIONAL
 }
 
+ECDSASignature ::= SEQUENCE {
+    r   INTEGER,
+    s   INTEGER
+}
+
+ECParameters ::= CHOICE {
+    namedCurve         OBJECT IDENTIFIER
+    -- implicitCurve   NULL
+    -- specifiedCurve  SpecifiedECDomain
+}
+-- implicitCurve and specifiedCurve MUST NOT be used in PKIX.
+-- Details for SpecifiedECDomain can be found in [X9.62].
+-- Any future additions to this CHOICE should be coordinated
+-- with ANSI X9.
+
+secp192r1 OBJECT IDENTIFIER ::= {
+   iso(1) member-body(2) us(840) ansi-X9-62(10045) curves(3)
+   prime(1) 1 }
+
+sect163k1 OBJECT IDENTIFIER ::= {
+   iso(1) identified-organization(3) certicom(132) curve(0) 1 }
+
+sect163r2 OBJECT IDENTIFIER ::= {
+   iso(1) identified-organization(3) certicom(132) curve(0) 15 }
+
+secp224r1 OBJECT IDENTIFIER ::= {
+   iso(1) identified-organization(3) certicom(132) curve(0) 33 }
+
+sect233k1 OBJECT IDENTIFIER ::= {
+   iso(1) identified-organization(3) certicom(132) curve(0) 26 }
+
+sect233r1 OBJECT IDENTIFIER ::= {
+   iso(1) identified-organization(3) certicom(132) curve(0) 27 }
+
+secp256r1 OBJECT IDENTIFIER ::= {
+   iso(1) member-body(2) us(840) ansi-X9-62(10045) curves(3)
+   prime(1) 7 }
+
+sect283k1 OBJECT IDENTIFIER ::= {
+   iso(1) identified-organization(3) certicom(132) curve(0) 16 }
+
+sect283r1 OBJECT IDENTIFIER ::= {
+   iso(1) identified-organization(3) certicom(132) curve(0) 17 }
+
+secp384r1 OBJECT IDENTIFIER ::= {
+   iso(1) identified-organization(3) certicom(132) curve(0) 34 }
+
+sect409k1 OBJECT IDENTIFIER ::= {
+   iso(1) identified-organization(3) certicom(132) curve(0) 36 }
+
+sect409r1 OBJECT IDENTIFIER ::= {
+   iso(1) identified-organization(3) certicom(132) curve(0) 37 }
+
+secp521r1 OBJECT IDENTIFIER ::= {
+   iso(1) identified-organization(3) certicom(132) curve(0) 35 }
+
+sect571k1 OBJECT IDENTIFIER ::= {
+   iso(1) identified-organization(3) certicom(132) curve(0) 38 }
+
+sect571r1 OBJECT IDENTIFIER ::= {
+   iso(1) identified-organization(3) certicom(132) curve(0) 39 }
+
+ECPoint ::= OCTET STRING
+
+ECPrivateKey ::= SEQUENCE {
+    version        INTEGER { ecPrivkeyVer1(1) } (ecPrivkeyVer1),
+    privateKey     OCTET STRING,
+    parameters [0] ECParameters {{ NamedCurve }} OPTIONAL,
+    publicKey  [1] BIT STRING OPTIONAL
+}
 
 END

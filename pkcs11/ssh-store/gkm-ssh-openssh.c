@@ -31,7 +31,12 @@ keytype_to_algo (const gchar *salgo)
 		return GCRY_PK_RSA;
 	else if (strcmp (salgo, "ssh-dss") == 0)
 		return GCRY_PK_DSA;
-	return 0;
+    else if (strcmp (salgo, "ecdsa-sha2-nistp256") == 0)
+        return GCRY_PK_ECDSA;
+    else if (strcmp (salgo, "ecdsa-sha2-nistp521") == 0)
+        return GCRY_PK_ECDSA;
+    else
+        return 0;
 }
 
 static gboolean
@@ -113,6 +118,31 @@ read_public_rsa (EggBuffer *req, gsize *offset, gcry_sexp_t *sexp)
 	return TRUE;
 }
 
+#define SEXP_PUBLIC_ECDSA  \
+	"(public-key"    \
+	"  (ecdsa"         \
+	"    (curve %s)"     \
+	"    (d %m)))"
+static gboolean
+read_public_ecdsa (EggBuffer *req, gsize *offset, gcry_sexp_t *sexp, gchar* algorithm)
+{
+	gcry_mpi_t p;
+	int gcry;
+
+	if (!read_mpi (req, offset, &p))
+		return FALSE;
+
+	gcry = gcry_sexp_build (sexp, NULL, SEXP_PUBLIC_ECDSA, algorithm, p);
+	if (gcry) {
+		g_warning ("couldn't parse incoming public ECDSA key: %s", gcry_strerror (gcry));
+		return FALSE;
+	}
+
+	gcry_mpi_release (p);
+
+	return TRUE;
+}
+
 static gboolean
 read_public (EggBuffer *req, gsize *offset, gcry_sexp_t *key, int *algo)
 {
@@ -125,10 +155,10 @@ read_public (EggBuffer *req, gsize *offset, gcry_sexp_t *key, int *algo)
 		return FALSE;
 
 	alg = keytype_to_algo (stype);
-	g_free (stype);
 
 	if (!alg) {
 		g_warning ("unsupported algorithm from SSH: %s", stype);
+        g_free (stype);
 		return FALSE;
 	}
 
@@ -138,6 +168,11 @@ read_public (EggBuffer *req, gsize *offset, gcry_sexp_t *key, int *algo)
 		break;
 	case GCRY_PK_DSA:
 		ret = read_public_dsa (req, offset, key);
+		break;
+    case GCRY_PK_ECDSA:
+    case GCRY_PK_ECC:
+		ret = read_public_ecdsa (req, offset, key, stype);
+        g_free (stype);
 		break;
 	default:
 		g_assert_not_reached ();
@@ -195,17 +230,19 @@ is_private_key_type (GQuark type)
 {
 	static GQuark PEM_RSA_PRIVATE_KEY;
 	static GQuark PEM_DSA_PRIVATE_KEY;
+	static GQuark PEM_ECDSA_PRIVATE_KEY;
 	static gsize quarks_inited = 0;
 
 	/* Initialize the first time through */
 	if (g_once_init_enter (&quarks_inited)) {
 		PEM_RSA_PRIVATE_KEY = g_quark_from_static_string ("RSA PRIVATE KEY");
 		PEM_DSA_PRIVATE_KEY = g_quark_from_static_string ("DSA PRIVATE KEY");
+		PEM_ECDSA_PRIVATE_KEY = g_quark_from_static_string ("EC PRIVATE KEY");
 		g_once_init_leave (&quarks_inited, 1);
 	}
 
 	/* Only handle SSHv2 private keys */
-	return (type == PEM_RSA_PRIVATE_KEY || type == PEM_DSA_PRIVATE_KEY);
+	return (type == PEM_RSA_PRIVATE_KEY || type == PEM_DSA_PRIVATE_KEY || type == PEM_ECDSA_PRIVATE_KEY);
 }
 
 static void

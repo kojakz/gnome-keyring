@@ -44,6 +44,9 @@ EGG_SECURE_DECLARE (data_der);
 static GQuark OID_PKIX1_RSA;
 static GQuark OID_PKIX1_DSA;
 static GQuark OID_PKCS12_PBE_3DES_SHA1;
+static GQuark OID_PKIX1_ECDSA_SECP256;
+static GQuark OID_PKIX1_ECDSA_SECP384;
+static GQuark OID_PKIX1_ECDSA_SECP521;
 
 static void
 init_quarks (void)
@@ -55,9 +58,13 @@ init_quarks (void)
 		#define QUARK(name, value) \
 			name = g_quark_from_static_string(value)
 
-		QUARK (OID_PKIX1_RSA, "1.2.840.113549.1.1.1");
-		QUARK (OID_PKIX1_DSA, "1.2.840.10040.4.1");
+		QUARK (OID_PKIX1_RSA,   "1.2.840.113549.1.1.1");
+		QUARK (OID_PKIX1_DSA,   "1.2.840.10040.4.1");
 		QUARK (OID_PKCS12_PBE_3DES_SHA1, "1.2.840.113549.1.12.1.3");
+        /* The following are required from RFC 5656 */
+        QUARK (OID_PKIX1_ECDSA_SECP256, "1.2.840.10045.3.1.7");
+        QUARK (OID_PKIX1_ECDSA_SECP384, "1.3.132.0.34");
+        QUARK (OID_PKIX1_ECDSA_SECP521, "1.3.132.0.35");
 
 		#undef QUARK
 
@@ -401,6 +408,75 @@ done:
 
 	return ret;
 }
+
+/* ecdsa private key decode.
+SEQUENCE {
+   version INTEGER 0x01 (1 decimal)
+   -- Private key, a scalar int
+   privateKey OCTETSTRING ce7164f8e22a43f9857ada65717320e27179f96ed2b9c5235d1b5a8626ef3e60
+   ECParameter
+   [0] {
+      NamedCurve
+      OBJECTIDENTIFIER 1.2.840.10045.3.1.7 (P-256)
+   }
+   publicKey
+   [1] {
+      BITSTRING 0x04ac6976dd5e90078962b49bb65d2623ecbdd351db490baa54b23ad1fe7fed4bb659a689cf30e670246984f52724b3360573c7077f96639e3545d0f6150e3efeff  -- y
+   }
+}
+ */
+
+/*
+ * Public key ECDSA
+ * [00]
+ * String with the curve name
+[00] 65636473612d736861322d6e69737470323536 -- ecdsa-sha2-nistp256
+[00]
+[00] 6e69737470323536 - nistp256
+[00]
+[00] 04ac6976dd5e90078962b49bb65d2623ecbdd351db490baa54b23ad1fe7fed4bb659a689cf30e670246984f52724b3360573c7077f96639e3545d0f6150e3efeff -- public key y
+ * */
+
+#define SEXP_PUBLIC_ECDSA \
+    "(public-key" \
+    "  (ecdsa" \
+    "    (curve %s)" \
+    "    (d %b)))"
+GkmDataResult
+gkm_data_der_read_public_key_ecdsa (GBytes* data,
+                                        gcry_sexp_t *s_key)
+ {
+    GkmDataResult ret = GKM_DATA_UNRECOGNIZED;
+    GNode *asn = NULL;
+    gcry_mpi_t point;
+    int res;
+
+    asn = egg_asn1x_create_and_decode (pk_asn1_tab, "ECDSAPublicKey", data);
+    if (!asn)
+        goto done;
+
+    ret = GKM_DATA_FAILURE;
+
+    if (!gkm_data_asn1_read_mpi (egg_asn1x_node (asn, "d", NULL), &point))
+        goto done;
+
+    res = gcry_sexp_build (s_key, NULL, SEXP_PUBLIC_ECDSA, point);
+    if (res)
+        goto done;
+
+    ret = GKM_DATA_SUCCESS;
+    return ret;
+
+done:
+    egg_asn1x_destroy(asn);
+    return ret;
+}
+
+#define SEXP_PRIVATE_ECDSA \
+    "(private-key"\
+    "  (ecdsa %S "\
+    "     (d %m)" \
+    "     (q %m)))"
 
 GkmDataResult
 gkm_data_der_read_public_key (GBytes *data, gcry_sexp_t *s_key)
@@ -808,6 +884,39 @@ done:
 }
 
 GBytes *
+gkm_data_der_write_public_key_ecdsa (gcry_sexp_t s_key)
+{
+	GNode *asn = NULL;
+	gcry_mpi_t d;
+	GBytes *result = NULL;
+    GString *curve_name;
+
+	d = NULL;
+    curve_name = g_string_new("ecdsa-sha2-nistp256");
+
+	asn = egg_asn1x_create (pk_asn1_tab, "ECDSAPublicKey");
+	g_return_val_if_fail (asn, NULL);
+
+	if (!gkm_sexp_extract_mpi (s_key, &d, "ecdsa", "d", NULL))
+		goto done;
+
+	if (!gkm_data_asn1_write_mpi (egg_asn1x_node (asn, "d", NULL), d))
+		goto done;
+
+    egg_asn1x_set_string_as_bytes(egg_asn1x_node (asn, "curve", NULL), g_string_free_to_bytes(curve_name));
+
+	result = egg_asn1x_encode (asn, NULL);
+	if (result == NULL)
+		g_warning ("couldn't encode public ecdsa key: %s", egg_asn1x_message (asn));
+
+done:
+	egg_asn1x_destroy (asn);
+	gcry_mpi_release (d);
+
+	return result;
+}
+
+GBytes *
 gkm_data_der_write_private_key_dsa_part (gcry_sexp_t skey)
 {
 	GNode *asn = NULL;
@@ -932,6 +1041,8 @@ gkm_data_der_write_public_key (gcry_sexp_t s_key)
 		return gkm_data_der_write_public_key_rsa (s_key);
 	case GCRY_PK_DSA:
 		return gkm_data_der_write_public_key_dsa (s_key);
+    case GCRY_PK_ECC:
+		return gkm_data_der_write_public_key_ecdsa (s_key);
 	default:
 		g_return_val_if_reached (NULL);
 	}

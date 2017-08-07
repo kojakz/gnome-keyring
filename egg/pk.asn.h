@@ -67,5 +67,8 @@ const ASN1_ARRAY_TYPE pk_asn1_tab[] = {
   { "prime", 1073741827, NULL },
   { "base", 1073741827, NULL },
   { "privateValueLength", 16387, NULL },
+
+  { "ECDAPublicKey", 1610612741, NULL },
+  { "point", 1073741827, NULL },
   { NULL, 0, NULL }
 };

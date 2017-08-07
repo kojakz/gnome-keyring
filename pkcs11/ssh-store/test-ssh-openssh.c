@@ -36,6 +36,8 @@
 EGG_SECURE_DEFINE_GLIB_GLOBALS ();
 
 static const gchar *PRIVATE_FILES[] = {
+    SRCDIR "/pkcs11/ssh-store/fixtures/id_ecdsa_plain",
+    SRCDIR "/pkcs11/ssh-store/fixtures/id_ecdsa_encrypted",
 	SRCDIR "/pkcs11/ssh-store/fixtures/id_rsa_encrypted",
 	SRCDIR "/pkcs11/ssh-store/fixtures/id_rsa_plain",
 	SRCDIR "/pkcs11/ssh-store/fixtures/id_dsa_encrypted",
@@ -43,6 +45,7 @@ static const gchar *PRIVATE_FILES[] = {
 };
 
 static const gchar *PUBLIC_FILES[] = {
+	SRCDIR "/pkcs11/ssh-store/fixtures/id_ecdsa_test.pub",
 	SRCDIR "/pkcs11/ssh-store/fixtures/id_rsa_test.pub",
 	SRCDIR "/pkcs11/ssh-store/fixtures/id_dsa_test.pub"
 };
@@ -101,6 +104,7 @@ test_parse_private (void)
 
 	for (i = 0; i < G_N_ELEMENTS (PRIVATE_FILES); ++i) {
 
+        printf("Looking to find: %s\n", PRIVATE_FILES[i]);
 		if (!g_file_get_contents (PRIVATE_FILES[i], &data, &n_data, NULL))
 			g_assert_not_reached ();
 
@@ -131,8 +135,8 @@ main (int argc, char **argv)
 #endif
 	g_test_init (&argc, &argv, NULL);
 
-	g_test_add_func ("/ssh-store/openssh/parse_private", test_parse_private);
 	g_test_add_func ("/ssh-store/openssh/parse_public", test_parse_public);
+	g_test_add_func ("/ssh-store/openssh/parse_private", test_parse_private);
 
 	return g_test_run ();
 }

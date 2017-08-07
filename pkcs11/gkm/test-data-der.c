@@ -76,6 +76,11 @@ const gchar *dsaprv = "(private-key (dsa" \
 "  (y #54734451DB79D4EEDF0BBCEBD43BB6CBB7B8584603B957080075DD318EB5B0266D4B20DC5EFF376BDFC4EA2983B1F7F02A39ED4C619ED68712729FFF3B7C696ADD1B6D748F56A4B4BEC5C4385E528423A3B88AE65E6D5500F97839E7A486255982189C3B4FA8D94338C76F0E5CAFC9A30A1ED728BB9F2091D594E3250A09EA00#)" \
 "  (x #00876F84F709D51108DFB0CBFA1F1C569C09C413EC#)))";
 
+const gchar *ecdsapub = "(public-key (ecdsa" \
+                         " (curve ecdsa-sha2-nistp256)"
+                         " (d #04AC6976DD5E90078962B49BB65D2623ECBDD351DB490BAA54B23AD1FE7FED4BB659A689CF30E670246984F52724B3360573C7077F96639E3545D0F6150E3EFEFF#)"
+                         "))";
+
 static gboolean
 compare_keys (gcry_sexp_t key, gcry_sexp_t sexp)
 {
@@ -166,6 +171,20 @@ test_der_dsa_public (Test *test, gconstpointer unused)
 	gcry_error_t gcry;
 
 	gcry = gcry_sexp_sscan (&key, NULL, dsapub, strlen (dsapub));
+	g_return_if_fail (gcry == 0);
+
+	test_der_public (key);
+
+	gcry_sexp_release (key);
+}
+
+static void
+test_der_ecdsa_public (Test *test, gconstpointer unused)
+{
+	gcry_sexp_t key;
+	gcry_error_t gcry;
+
+	gcry = gcry_sexp_sscan (&key, NULL, ecdsapub, strlen (ecdsapub));
 	g_return_if_fail (gcry == 0);
 
 	test_der_public (key);
@@ -605,6 +624,7 @@ main (int argc, char **argv)
 #endif
 	g_test_init (&argc, &argv, NULL);
 
+	g_test_add ("/gkm/data-der/der_ecdsa_public", Test, NULL, setup, test_der_ecdsa_public, teardown);
 	g_test_add ("/gkm/data-der/der_rsa_public", Test, NULL, setup, test_der_rsa_public, teardown);
 	g_test_add ("/gkm/data-der/der_dsa_public", Test, NULL, setup, test_der_dsa_public, teardown);
 	g_test_add ("/gkm/data-der/der_rsa_private", Test, NULL, setup, test_der_rsa_private, teardown);
